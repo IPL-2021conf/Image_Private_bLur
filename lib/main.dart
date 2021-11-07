@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'screens/sign_up.dart';
 import 'screens/login.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
 
-void main() => runApp(MyApp());
+const debug = true;
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FlutterDownloader.initialize(debug: debug);
+  runApp(MyApp());
+}
 
 class MyApp extends StatelessWidget {
   @override

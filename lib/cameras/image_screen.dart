@@ -8,6 +8,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:network_to_file_image/network_to_file_image.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:android_path_provider/android_path_provider.dart';
+import 'package:device_info/device_info.dart';
 
 class Photo {
   var urlImage;
@@ -35,6 +38,8 @@ class _ViewImage extends State<ViewImage> {
   List<String> images = [];
   int counts = 0;
   var list;
+
+  late String _localPath;
 
   void uploading(String path) async {
     var request = makePost(
@@ -81,6 +86,7 @@ class _ViewImage extends State<ViewImage> {
       isPressed.add(false);
       basicColor.add(Colors.transparent);
     }
+    await _prepareSaveDir();
   }
 
   void sendPerson() async {
@@ -101,6 +107,8 @@ class _ViewImage extends State<ViewImage> {
     print(await response.stream.bytesToString());
 
     Directory d = await getApplicationDocumentsDirectory();
+
+    await _prepareSaveDir();
   }
 
   Widget makeButton(int index) {
@@ -219,18 +227,6 @@ class _ViewImage extends State<ViewImage> {
                         onPressed: () async {
                           setState(() {});
                           print('dd');
-
-                          final docPath = await getExternalStorageDirectory();
-                          print(docPath);
-                          final filename = basename(editImage!.path);
-                          print(filename);
-                          try {
-                            final localImage = await editImage!
-                                .copy('${docPath!.path}/$filename');
-                            print(localImage);
-                          } catch (e) {
-                            print(e);
-                          }
                         },
                         elevation: 0,
                         child: Icon(
@@ -259,8 +255,20 @@ class _ViewImage extends State<ViewImage> {
                     bottom: 100,
                     right: 0,
                     child: ElevatedButton(
-                        onPressed: () {
-                          sendPerson();
+                        onPressed: () async {
+                          // sendPerson();
+                          _localPath = (await _findLocalPath())!;
+
+                          final taskId = await FlutterDownloader.enqueue(
+                            url:
+                                'https://bucket-for-ipl.s3.ap-northeast-2.amazonaws.com/videoproc/test2.avi',
+                            savedDir: _localPath,
+                            showNotification:
+                                true, // show download progress in status bar (for Android)
+                            openFileFromNotification:
+                                true, // click on notification to open downloaded file (for Android)
+                            saveInPublicStorage: true,
+                          );
                         },
                         child: Text('send'))),
                 Positioned(
@@ -281,6 +289,31 @@ class _ViewImage extends State<ViewImage> {
         ],
       ),
     );
+  }
+
+  Future<void> _prepareSaveDir() async {
+    _localPath = (await _findLocalPath())!;
+    final savedDir = Directory(_localPath);
+    bool hasExisted = await savedDir.exists();
+    if (!hasExisted) {
+      savedDir.create();
+    }
+  }
+
+  Future<String?> _findLocalPath() async {
+    var externalStorageDirPath;
+    if (Platform.isAndroid) {
+      try {
+        externalStorageDirPath = await AndroidPathProvider.downloadsPath;
+      } catch (e) {
+        final directory = await getExternalStorageDirectory();
+        externalStorageDirPath = directory?.path;
+      }
+    } else if (Platform.isIOS) {
+      externalStorageDirPath =
+          (await getApplicationDocumentsDirectory()).absolute.path;
+    }
+    return externalStorageDirPath;
   }
 
   http.MultipartRequest makePost(var token, String address) {
